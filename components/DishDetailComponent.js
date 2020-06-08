@@ -1,9 +1,10 @@
 import React, { Component, createRef } from 'react'
-import { Text, View, ScrollView, FlatList, Modal, StyleSheet, Button } from 'react-native'
+import { Text, View, ScrollView, FlatList, Modal, StyleSheet, Button, Alert, PanResponder, Share } from 'react-native'
 import { Card, Icon, Rating, Input } from 'react-native-elements'
 import { baseUrl } from '../shared/baseUrl'
 import { connect } from 'react-redux'
 import { postFavorite, postComment } from '../redux/ActionCreators'
+import * as Animatable from 'react-native-animatable'
 
 const mapStateToProps = state => ({
     dishes: state.dishes,
@@ -19,9 +20,68 @@ const mapDispatchToProps = dispatch => ({
 function RenderDish(props) {
 
     const dish = props.dish;
+
+    handleViewRef = ref => this.view = ref
+
+    const recognizeDrag = ({moveX, moveY, dx, dy}) => {
+        if (dx < -200)
+            return true
+        else
+            return false
+    }
+
+    const recognizeleftDrag = ({moveX, moveY, dx, dy}) => {
+        if (dx > 200)
+            return true
+        else
+            return false
+    }
+
+    const panResponder = PanResponder.create({
+        onStartShouldSetPanResponder: (e, gestureState) => {
+            return true
+        },
+        onPanResponderGrant: () => {
+            this.view.rubberBand(1000)
+            .then(endState => console.log(endState.finished? 'finished' : 'cancelled'))
+        },
+        onPanResponderEnd: (e, gestureState) => {
+            if (recognizeDrag(gestureState))
+                Alert.alert('Add to Favorites?', 
+                'Are you sure you wish to add ' + dish.name + ' to your favorites?',
+                [
+                    {
+                        text: 'Cancel',
+                        onPress: () => console.log('Cancel Pressed'),
+                        style: 'cancel'
+                    },
+                    {
+                        text: 'OK',
+                        onPress: () => props.favorite ? console.log('Already Favorite') : props.onPress()
+                    }
+                ],
+                {cancelable: true})
+            else if (recognizeleftDrag(gestureState))
+                props.toggleModal()
+            return true
+        }
+    })
+
+    const shareDish = (title, message, url) => {
+        Share.share({
+            title: title,
+            message: title + ': ' + message + ' ' + url,
+            url: url
+        }, {
+            dialogTitle: 'Share ' + title
+        })
+    }
     
-        if (dish != null) {
-            return(
+    if (dish != null) {
+        return(
+            <Animatable.View animation='fadeInDown' duration={2000} delay={1000} 
+            ref={this.handleViewRef}
+            {...panResponder.panHandlers} >
                 <Card
                 featuredTitle={dish.name}
                 image={{uri: baseUrl + dish.image}}
@@ -38,13 +98,19 @@ function RenderDish(props) {
                             type='font-awesome' 
                             color='#512DA8' 
                             onPress={() => props.toggleModal()} />
+                        <Icon style={styles.icons, {flex: 1}} raised reverse name={'share'} 
+                            type='font-awesome' 
+                            color='#51D2A8'
+                            onPress={() => shareDish(dish.name, dish.description, baseUrl + dish.image)} />
+                        
                     </View>
                 </Card>
-            );
-        }
-        else {
-            return(<View></View>);
-        }
+            </Animatable.View>
+        );
+    }
+    else {
+        return(<View></View>);
+    }
 }
 
 function RenderComments(props) {
@@ -61,12 +127,14 @@ function RenderComments(props) {
     }
 
     return(
-        <Card title="Comments">
-            <FlatList
-            data={comments}
-            renderItem={renderCommentItem}
-            keyExtractor={item => item.id.toString()} />
-        </Card>
+        <Animatable.View animation='fadeInUp' duration={2000} delay={1000} >
+            <Card title="Comments">
+                <FlatList
+                data={comments}
+                renderItem={renderCommentItem}
+                keyExtractor={item => item.id.toString()} />
+            </Card>
+        </Animatable.View>
     )
 }
 
